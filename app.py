@@ -56,10 +56,27 @@ def main():
             st.warning("데이터베이스에 질문이 없습니다. '질문 관리' 페이지에서 질문을 추가하세요.")
             return
         
-        # 세션 상태 초기화
-        if "shuffled_questions" not in st.session_state:
-            st.session_state.shuffled_questions = random.sample(all_questions, len(all_questions))
+        # 질문 셔플 여부 선택
+        shuffle_questions = st.checkbox(
+            "질문 순서를 랜덤으로 섞기",
+            value=st.session_state.get("shuffle_questions", True),
+        )
+        st.session_state.shuffle_questions = shuffle_questions
+        
+        # 세션 상태 초기화 (셔플 옵션 변경 시에도 초기화)
+        need_init = (
+            "shuffled_questions" not in st.session_state
+            or "current_index" not in st.session_state
+            or st.session_state.get("last_shuffle_option") != shuffle_questions
+        )
+        if need_init:
+            if shuffle_questions:
+                st.session_state.shuffled_questions = random.sample(all_questions, len(all_questions))
+            else:
+                # 셔플하지 않고 등록된 순서대로 사용
+                st.session_state.shuffled_questions = all_questions[:]
             st.session_state.current_index = 0
+            st.session_state.last_shuffle_option = shuffle_questions
         
         questions = st.session_state.shuffled_questions
         current_idx = st.session_state.current_index
@@ -149,8 +166,14 @@ def main():
             st.balloons()
             
             if st.button("🔄 다시 시작"):
-                st.session_state.shuffled_questions = random.sample(all_questions, len(all_questions))
+                # 다시 시작 시에도 현재 셔플 옵션을 반영
+                shuffle_questions = st.session_state.get("shuffle_questions", True)
+                if shuffle_questions:
+                    st.session_state.shuffled_questions = random.sample(all_questions, len(all_questions))
+                else:
+                    st.session_state.shuffled_questions = all_questions[:]
                 st.session_state.current_index = 0
+                st.session_state.last_shuffle_option = shuffle_questions
                 st.rerun()
     
     except sqlite3.OperationalError:
