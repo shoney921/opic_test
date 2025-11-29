@@ -1,0 +1,30 @@
+# 가상환경
+venv/
+env/
+ENV/
+
+# 데이터베이스
+# *.db
+# *.sqlite
+# *.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Streamlit
+.streamlit/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+

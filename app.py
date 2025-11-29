@@ -1,0 +1,162 @@
+import streamlit as st
+import sqlite3
+import random
+from typing import List, Dict, Optional
+
+# 데이터베이스 파일 경로
+DB_PATH = "questions.db"
+
+# 페이지 설정
+st.set_page_config(
+    page_title="질문 답변 연습",
+    page_icon="❓",
+    layout="wide"
+)
+
+def get_all_questions() -> List[Dict]:
+    """데이터베이스에서 모든 질문을 가져옵니다."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT id, question FROM questions ORDER BY id")
+    questions = [{"id": row["id"], "question": row["question"]} for row in cursor.fetchall()]
+    
+    conn.close()
+    return questions
+
+def save_answer(question_id: int, answer: str, difficulty: int):
+    """답변을 데이터베이스에 저장합니다."""
+    if not answer.strip():
+        return False
+    
+    if difficulty < 1 or difficulty > 5:
+        return False
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO answers (question_id, answer, difficulty) 
+        VALUES (?, ?, ?)
+    ''', (question_id, answer, difficulty))
+    
+    conn.commit()
+    conn.close()
+    return True
+
+def main():
+    st.title("❓ 문제 풀기")
+    st.markdown("---")
+    
+    try:
+        all_questions = get_all_questions()
+        
+        if not all_questions:
+            st.warning("데이터베이스에 질문이 없습니다. '질문 관리' 페이지에서 질문을 추가하세요.")
+            return
+        
+        # 세션 상태 초기화
+        if "shuffled_questions" not in st.session_state:
+            st.session_state.shuffled_questions = random.sample(all_questions, len(all_questions))
+            st.session_state.current_index = 0
+        
+        questions = st.session_state.shuffled_questions
+        current_idx = st.session_state.current_index
+        
+        if current_idx < len(questions):
+            current_question = questions[current_idx]
+            
+            # 진행 상황 표시
+            progress = (current_idx + 1) / len(questions)
+            st.progress(progress)
+            st.caption(f"진행률: {current_idx + 1} / {len(questions)} ({int(progress * 100)}%)")
+            
+            st.markdown("---")
+            
+            # 질문 표시
+            st.subheader(f"질문 {current_idx + 1}")
+            st.info(f"**{current_question['question']}**")
+            
+            st.markdown("---")
+            
+            # 답변 입력 영역
+            st.subheader("💬 답변 작성")
+            
+            # 답변 텍스트 박스
+            answer_key = f"answer_{current_question['id']}_{current_idx}"
+            if answer_key not in st.session_state:
+                st.session_state[answer_key] = ""
+            
+            answer = st.text_area(
+                "답변을 입력하세요:",
+                value=st.session_state[answer_key],
+                height=300,
+                placeholder="여기에 답변을 타이핑하세요...",
+                key=answer_key
+            )
+            
+            # 난이도 선택
+            st.subheader("📊 난이도 선택")
+            difficulty_key = f"difficulty_{current_question['id']}_{current_idx}"
+            if difficulty_key not in st.session_state:
+                st.session_state[difficulty_key] = 3
+            
+            difficulty = st.slider(
+                "난이도 (1: 매우 쉬움 ~ 5: 매우 어려움)",
+                min_value=1,
+                max_value=5,
+                value=st.session_state[difficulty_key],
+                key=difficulty_key
+            )
+            
+            # 난이도 설명
+            difficulty_labels = {
+                1: "매우 쉬움",
+                2: "쉬움",
+                3: "보통",
+                4: "어려움",
+                5: "매우 어려움"
+            }
+            st.caption(f"선택한 난이도: {difficulty} ({difficulty_labels[difficulty]})")
+            
+            st.markdown("---")
+            
+            # 다음 버튼
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col2:
+                if st.button("다음 ▶️", type="primary", use_container_width=True):
+                    # 답변 저장
+                    if answer.strip():
+                        if save_answer(current_question["id"], answer, difficulty):
+                            st.session_state.current_index = current_idx + 1
+                            # 다음 질문을 위해 세션 상태 초기화
+                            if current_idx + 1 < len(questions):
+                                next_question = questions[current_idx + 1]
+                                next_answer_key = f"answer_{next_question['id']}_{current_idx + 1}"
+                                next_difficulty_key = f"difficulty_{next_question['id']}_{current_idx + 1}"
+                                if next_answer_key not in st.session_state:
+                                    st.session_state[next_answer_key] = ""
+                                if next_difficulty_key not in st.session_state:
+                                    st.session_state[next_difficulty_key] = 3
+                            st.rerun()
+                        else:
+                            st.error("답변 저장 중 오류가 발생했습니다.")
+                    else:
+                        st.warning("답변을 입력해주세요.")
+        else:
+            st.success("🎉 모든 문제를 완료했습니다!")
+            st.balloons()
+            
+            if st.button("🔄 다시 시작"):
+                st.session_state.shuffled_questions = random.sample(all_questions, len(all_questions))
+                st.session_state.current_index = 0
+                st.rerun()
+    
+    except sqlite3.OperationalError:
+        st.error(f"데이터베이스 파일을 찾을 수 없습니다. 먼저 `python init_db.py`를 실행하여 데이터베이스를 초기화하세요.")
+    except Exception as e:
+        st.error(f"오류가 발생했습니다: {str(e)}")
+
+if __name__ == "__main__":
+    main()
