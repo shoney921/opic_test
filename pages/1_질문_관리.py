@@ -94,6 +94,58 @@ def delete_question(question_id: int) -> bool:
     conn.close()
     return True
 
+def add_answer(question_id: int, answer: str, difficulty: int) -> bool:
+    """새 답변을 데이터베이스에 추가합니다."""
+    if not answer.strip():
+        return False
+    
+    if difficulty < 1 or difficulty > 5:
+        return False
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO answers (question_id, answer, difficulty) 
+        VALUES (?, ?, ?)
+    ''', (question_id, answer, difficulty))
+    
+    conn.commit()
+    conn.close()
+    return True
+
+def update_answer(answer_id: int, answer: str, difficulty: int) -> bool:
+    """답변을 수정합니다."""
+    if not answer.strip():
+        return False
+    
+    if difficulty < 1 or difficulty > 5:
+        return False
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        UPDATE answers 
+        SET answer = ?, difficulty = ?
+        WHERE id = ?
+    ''', (answer, difficulty, answer_id))
+    
+    conn.commit()
+    conn.close()
+    return True
+
+def delete_answer(answer_id: int) -> bool:
+    """답변을 삭제합니다."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute("DELETE FROM answers WHERE id = ?", (answer_id,))
+    
+    conn.commit()
+    conn.close()
+    return True
+
 def main():
     st.title("📝 질문 관리")
     st.markdown("---")
@@ -173,12 +225,50 @@ def main():
 
             st.markdown("---")
 
+            # 답변 추가 섹션
+            with st.expander("➕ 새 답변 추가", expanded=False):
+                new_answer_text = st.text_area(
+                    "답변 내용을 입력하세요:",
+                    height=200,
+                    placeholder="여기에 답변을 입력하세요...",
+                    key=f"new_answer_{selected_question_id}"
+                )
+                
+                new_answer_difficulty = st.slider(
+                    "난이도 (1: 매우 쉬움 ~ 5: 매우 어려움)",
+                    min_value=1,
+                    max_value=5,
+                    value=3,
+                    key=f"new_answer_difficulty_{selected_question_id}"
+                )
+                
+                difficulty_labels = {
+                    1: "매우 쉬움",
+                    2: "쉬움",
+                    3: "보통",
+                    4: "어려움",
+                    5: "매우 어려움",
+                }
+                st.caption(f"선택한 난이도: {new_answer_difficulty} ({difficulty_labels[new_answer_difficulty]})")
+                
+                if st.button("답변 추가", type="primary", key=f"add_answer_btn_{selected_question_id}"):
+                    if new_answer_text.strip():
+                        if add_answer(selected_question_id, new_answer_text.strip(), new_answer_difficulty):
+                            st.success("답변이 추가되었습니다!")
+                            st.rerun()
+                        else:
+                            st.error("답변 추가 중 오류가 발생했습니다.")
+                    else:
+                        st.warning("답변 내용을 입력해주세요.")
+
+            st.markdown("---")
+
             # 답변 목록
             st.subheader("📋 답변 목록")
 
             if not answers:
                 st.info("이 질문에 대한 답변이 아직 없습니다.")
-                st.caption("'문제 풀기' 화면에서 이 질문에 답변을 작성할 수 있습니다.")
+                st.caption("위의 '새 답변 추가'를 사용하여 답변을 추가할 수 있습니다.")
             else:
                 for idx, answer in enumerate(answers, 1):
                     difficulty_labels = {
@@ -189,21 +279,85 @@ def main():
                         5: "매우 어려움",
                     }
                     difficulty_label = difficulty_labels.get(answer["difficulty"], "보통")
+                    
+                    answer_id = answer["id"]
+                    edit_key = f"edit_mode_{answer_id}"
+                    is_editing = st.session_state.get(edit_key, False)
 
                     with st.container():
-                        header_col1, header_col2 = st.columns([3, 1])
+                        header_col1, header_col2, header_col3 = st.columns([3, 1, 1])
                         with header_col1:
                             st.markdown(f"**답변 {idx}**")
                         with header_col2:
                             st.markdown(f"난이도: **{answer['difficulty']}** ({difficulty_label})")
+                        with header_col3:
+                            if not is_editing:
+                                if st.button("✏️ 수정", key=f"edit_btn_{answer_id}"):
+                                    st.session_state[edit_key] = True
+                                    st.session_state[f"edit_answer_{answer_id}"] = answer["answer"]
+                                    st.session_state[f"edit_difficulty_{answer_id}"] = answer["difficulty"]
+                                    st.rerun()
+                            else:
+                                if st.button("❌ 취소", key=f"cancel_btn_{answer_id}"):
+                                    st.session_state[edit_key] = False
+                                    st.rerun()
 
-                        st.text_area(
-                            "답변 내용",
-                            value=answer["answer"],
-                            height=200,
-                            disabled=True,
-                            key=f"answer_view_{answer['id']}",
-                        )
+                        if is_editing:
+                            # 수정 모드
+                            edited_answer = st.text_area(
+                                "답변 내용",
+                                value=st.session_state.get(f"edit_answer_{answer_id}", answer["answer"]),
+                                height=200,
+                                key=f"edit_answer_text_{answer_id}"
+                            )
+                            
+                            edited_difficulty = st.slider(
+                                "난이도 (1: 매우 쉬움 ~ 5: 매우 어려움)",
+                                min_value=1,
+                                max_value=5,
+                                value=st.session_state.get(f"edit_difficulty_{answer_id}", answer["difficulty"]),
+                                key=f"edit_difficulty_slider_{answer_id}"
+                            )
+                            st.caption(f"선택한 난이도: {edited_difficulty} ({difficulty_labels[edited_difficulty]})")
+                            
+                            col1, col2, col3 = st.columns([1, 1, 2])
+                            with col1:
+                                if st.button("💾 저장", type="primary", key=f"save_btn_{answer_id}"):
+                                    if edited_answer.strip():
+                                        if update_answer(answer_id, edited_answer.strip(), edited_difficulty):
+                                            st.success("답변이 수정되었습니다!")
+                                            st.session_state[edit_key] = False
+                                            st.rerun()
+                                        else:
+                                            st.error("답변 수정 중 오류가 발생했습니다.")
+                                    else:
+                                        st.warning("답변 내용을 입력해주세요.")
+                            with col2:
+                                if st.button("🗑️ 삭제", key=f"delete_btn_{answer_id}"):
+                                    if delete_answer(answer_id):
+                                        st.success("답변이 삭제되었습니다!")
+                                        st.session_state[edit_key] = False
+                                        st.rerun()
+                                    else:
+                                        st.error("답변 삭제 중 오류가 발생했습니다.")
+                        else:
+                            # 읽기 모드
+                            st.text_area(
+                                "답변 내용",
+                                value=answer["answer"],
+                                height=200,
+                                disabled=True,
+                                key=f"answer_view_{answer_id}",
+                            )
+                            
+                            # 삭제 버튼 (읽기 모드에서도 표시)
+                            if st.button("🗑️ 삭제", key=f"delete_view_btn_{answer_id}"):
+                                if delete_answer(answer_id):
+                                    st.success("답변이 삭제되었습니다!")
+                                    st.rerun()
+                                else:
+                                    st.error("답변 삭제 중 오류가 발생했습니다.")
+                        
                         st.caption(f"작성일: {answer['created_at']}")
 
                         if idx < len(answers):
@@ -216,7 +370,7 @@ def main():
 
             questions = get_all_questions()
 
-            st.text(f"questions: {questions}")
+            # st.text(f"questions: {questions}")
 
             if not questions:
                 st.info("등록된 질문이 없습니다. 위의 '새 질문 추가'를 사용하여 질문을 추가하세요.")
