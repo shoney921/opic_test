@@ -130,7 +130,7 @@ def main():
             # 뒤로가기 버튼
             if st.button("← 질문 목록으로 돌아가기"):
                 st.session_state.selected_question_id = None
-                st.experimental_rerun()
+                st.rerun()
 
             st.markdown("---")
 
@@ -274,7 +274,7 @@ def main():
                             label += " ↓"
                     if st.button(label, key="sort_by_id"):
                         toggle_sort("id")
-                        st.experimental_rerun()
+                        st.rerun()
 
                 # 유형 컬럼 헤더
                 with header_col2:
@@ -286,7 +286,7 @@ def main():
                             label += " ↓"
                     if st.button(label, key="sort_by_type"):
                         toggle_sort("type")
-                        st.experimental_rerun()
+                        st.rerun()
 
                 # 답변 수 컬럼 헤더
                 with header_col3:
@@ -298,7 +298,7 @@ def main():
                             label += " ↓"
                     if st.button(label, key="sort_by_answers"):
                         toggle_sort("answers")
-                        st.experimental_rerun()
+                        st.rerun()
 
                                 # 평균 난이도 컬럼 헤더
                 with header_col4:
@@ -310,7 +310,7 @@ def main():
                             label += " ↓"
                     if st.button(label, key="sort_by_difficulty"):
                         toggle_sort("difficulty")
-                        st.experimental_rerun()
+                        st.rerun()
 
                 # 선택된 정렬 기준/순서에 따라 question_stats 정렬
                 if sort_order != "none":
@@ -351,7 +351,7 @@ def main():
                                 use_container_width=True,
                             ):
                                 st.session_state.selected_question_id = question_id
-                                st.experimental_rerun()
+                                st.rerun()
 
                         with col2:
                             st.badge(question['type'], color="red", width="content")
