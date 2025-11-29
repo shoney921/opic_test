@@ -11,11 +11,12 @@ def get_all_questions() -> List[Dict]:
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cursor.execute("SELECT id, question, created_at FROM questions ORDER BY id")
+    cursor.execute("SELECT id, question, type, created_at FROM questions ORDER BY id")
     questions = [
         {
             "id": row["id"],
             "question": row["question"],
+            "type": row["type"],
             "created_at": row["created_at"]
         }
         for row in cursor.fetchall()
@@ -215,6 +216,8 @@ def main():
 
             questions = get_all_questions()
 
+            st.text(f"questions: {questions}")
+
             if not questions:
                 st.info("등록된 질문이 없습니다. 위의 '새 질문 추가'를 사용하여 질문을 추가하세요.")
             else:
@@ -259,7 +262,7 @@ def main():
                 sort_order = st.session_state.question_sort_order
 
                 # 컬럼 헤더 버튼 렌더링
-                header_col1, header_col2, header_col3 = st.columns([4, 1, 1])
+                header_col1, header_col2, header_col3, header_col4 = st.columns([4, 1, 1, 1])
 
                 # 질문(ID) 컬럼 헤더
                 with header_col1:
@@ -273,16 +276,16 @@ def main():
                         toggle_sort("id")
                         st.experimental_rerun()
 
-                # 평균 난이도 컬럼 헤더
+                # 유형 컬럼 헤더
                 with header_col2:
-                    label = "평균 난이도"
-                    if sort_key == "difficulty":
+                    label = "유형"
+                    if sort_key == "type":
                         if sort_order == "asc":
                             label += " ↑"
                         elif sort_order == "desc":
                             label += " ↓"
-                    if st.button(label, key="sort_by_difficulty"):
-                        toggle_sort("difficulty")
+                    if st.button(label, key="sort_by_type"):
+                        toggle_sort("type")
                         st.experimental_rerun()
 
                 # 답변 수 컬럼 헤더
@@ -295,6 +298,18 @@ def main():
                             label += " ↓"
                     if st.button(label, key="sort_by_answers"):
                         toggle_sort("answers")
+                        st.experimental_rerun()
+
+                                # 평균 난이도 컬럼 헤더
+                with header_col4:
+                    label = "평균 난이도"
+                    if sort_key == "difficulty":
+                        if sort_order == "asc":
+                            label += " ↑"
+                        elif sort_order == "desc":
+                            label += " ↓"
+                    if st.button(label, key="sort_by_difficulty"):
+                        toggle_sort("difficulty")
                         st.experimental_rerun()
 
                 # 선택된 정렬 기준/순서에 따라 question_stats 정렬
@@ -326,12 +341,12 @@ def main():
                     answers_count = question.get("answers_count", 0)
 
                     with st.container():
-                        col1, col2, col3 = st.columns([4, 1, 1])
+                        col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
 
                         with col1:
                             # 질문 클릭 시 상세(답변 목록) 보기로 전환
                             if st.button(
-                                f"**질문 {question_id}:** {question['question']}",
+                                f"**{question_id}** : {question['question']}",
                                 key=f"btn_{question_id}",
                                 use_container_width=True,
                             ):
@@ -339,6 +354,12 @@ def main():
                                 st.experimental_rerun()
 
                         with col2:
+                            st.badge(question['type'], color="red", width="content")
+
+                        with col3:
+                            st.badge(f"{answers_count}개", color="green", width="content")
+
+                        with col4:
                             # 평균 난이도 표시
                             if avg_difficulty is not None:
                                 difficulty_labels = {
@@ -349,14 +370,11 @@ def main():
                                     5: "매우 어려움",
                                 }
                                 difficulty_label = difficulty_labels.get(int(avg_difficulty), "보통")
-                                st.text(f"평균 난이도: {avg_difficulty:.2f} ({difficulty_label})")
+                                st.badge(f"{avg_difficulty:.2f} ({difficulty_label})", color="blue", width="content")
                             else:
-                                st.text("평균 난이도: - (답변 없음)")
+                                st.badge("없음", color="gray", width="content")
 
-                        with col3:
-                            st.text(f"답변 수: {answers_count}")
 
-        
     except sqlite3.OperationalError:
         st.error(f"데이터베이스 파일을 찾을 수 없습니다. 먼저 `python init_db.py`를 실행하여 데이터베이스를 초기화하세요.")
     except Exception as e:
