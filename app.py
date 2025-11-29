@@ -25,6 +25,48 @@ def get_all_questions() -> List[Dict]:
     conn.close()
     return questions
 
+def get_question_answer_count(question_id: int) -> int:
+    """질문의 답변 개수를 반환합니다."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT COUNT(*) as count
+        FROM answers
+        WHERE question_id = ?
+    ''', (question_id,))
+    
+    row = cursor.fetchone()
+    conn.close()
+    
+    return row[0] if row else 0
+
+def filter_questions_by_max_answer_count(questions: List[Dict]) -> List[Dict]:
+    """답변 개수가 최대값과 같은 질문들을 제외한 질문 리스트를 반환합니다."""
+    if not questions:
+        return questions
+    
+    # 각 질문의 답변 개수 계산
+    question_answer_counts = {}
+    max_count = 0
+    
+    for question in questions:
+        count = get_question_answer_count(question["id"])
+        question_answer_counts[question["id"]] = count
+        max_count = max(max_count, count)
+    
+    # 최대 답변 개수가 0이면 모든 질문 반환 (답변이 없는 경우)
+    if max_count == 0:
+        return questions
+    
+    # 최대 답변 개수와 다른 질문들만 필터링
+    filtered_questions = [
+        question for question in questions
+        if question_answer_counts[question["id"]] < max_count
+    ]
+    
+    return filtered_questions
+
 def save_answer(question_id: int, answer: str, difficulty: int):
     """답변을 데이터베이스에 저장합니다."""
     if not answer.strip():
@@ -56,6 +98,13 @@ def main():
             st.warning("데이터베이스에 질문이 없습니다. '질문 관리' 페이지에서 질문을 추가하세요.")
             return
         
+        # 답변 개수가 최대값과 같은 질문들을 제외
+        filtered_questions = filter_questions_by_max_answer_count(all_questions)
+        
+        if not filtered_questions:
+            st.warning("모든 질문이 최대 답변 개수를 가지고 있어 표시할 질문이 없습니다.")
+            return
+        
         # 질문 셔플 여부 선택
         shuffle_questions = st.checkbox(
             "질문 순서를 랜덤으로 섞기",
@@ -68,15 +117,17 @@ def main():
             "shuffled_questions" not in st.session_state
             or "current_index" not in st.session_state
             or st.session_state.get("last_shuffle_option") != shuffle_questions
+            or st.session_state.get("last_filtered_questions_count") != len(filtered_questions)
         )
         if need_init:
             if shuffle_questions:
-                st.session_state.shuffled_questions = random.sample(all_questions, len(all_questions))
+                st.session_state.shuffled_questions = random.sample(filtered_questions, len(filtered_questions))
             else:
                 # 셔플하지 않고 등록된 순서대로 사용
-                st.session_state.shuffled_questions = all_questions[:]
+                st.session_state.shuffled_questions = filtered_questions[:]
             st.session_state.current_index = 0
             st.session_state.last_shuffle_option = shuffle_questions
+            st.session_state.last_filtered_questions_count = len(filtered_questions)
         
         questions = st.session_state.shuffled_questions
         current_idx = st.session_state.current_index
@@ -166,14 +217,16 @@ def main():
             st.balloons()
             
             if st.button("🔄 다시 시작"):
-                # 다시 시작 시에도 현재 셔플 옵션을 반영
+                # 다시 시작 시에도 현재 셔플 옵션과 필터링을 반영
+                filtered_questions = filter_questions_by_max_answer_count(all_questions)
                 shuffle_questions = st.session_state.get("shuffle_questions", True)
                 if shuffle_questions:
-                    st.session_state.shuffled_questions = random.sample(all_questions, len(all_questions))
+                    st.session_state.shuffled_questions = random.sample(filtered_questions, len(filtered_questions))
                 else:
-                    st.session_state.shuffled_questions = all_questions[:]
+                    st.session_state.shuffled_questions = filtered_questions[:]
                 st.session_state.current_index = 0
                 st.session_state.last_shuffle_option = shuffle_questions
+                st.session_state.last_filtered_questions_count = len(filtered_questions)
                 st.rerun()
     
     except sqlite3.OperationalError:
