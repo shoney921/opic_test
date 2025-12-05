@@ -2,9 +2,17 @@ import streamlit as st
 import sqlite3
 import random
 from typing import List, Dict, Optional
+from repository import QuestionRepository
+from ai_service import AzureOpenAIService
 
 # 데이터베이스 파일 경로
 DB_PATH = "questions.db"
+
+# Repository 인스턴스 생성
+question_repository = QuestionRepository(DB_PATH)
+
+# ai
+ai_service = AzureOpenAIService()
 
 # 페이지 설정
 st.set_page_config(
@@ -12,34 +20,6 @@ st.set_page_config(
     page_icon="❓",
     layout="wide"
 )
-
-def get_all_questions() -> List[Dict]:
-    """데이터베이스에서 모든 질문을 가져옵니다."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT id, question FROM questions ORDER BY id")
-    questions = [{"id": row["id"], "question": row["question"]} for row in cursor.fetchall()]
-    
-    conn.close()
-    return questions
-
-def get_question_answer_count(question_id: int) -> int:
-    """질문의 답변 개수를 반환합니다."""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT COUNT(*) as count
-        FROM answers
-        WHERE question_id = ?
-    ''', (question_id,))
-    
-    row = cursor.fetchone()
-    conn.close()
-    
-    return row[0] if row else 0
 
 def filter_questions_by_max_answer_count(questions: List[Dict]) -> List[Dict]:
     """답변 개수가 최대값과 같은 질문들을 제외한 질문 리스트를 반환합니다."""
@@ -51,7 +31,7 @@ def filter_questions_by_max_answer_count(questions: List[Dict]) -> List[Dict]:
     max_count = 0
     
     for question in questions:
-        count = get_question_answer_count(question["id"])
+        count = question_repository.get_question_answer_count(question["id"])
         question_answer_counts[question["id"]] = count
         max_count = max(max_count, count)
     
@@ -67,32 +47,12 @@ def filter_questions_by_max_answer_count(questions: List[Dict]) -> List[Dict]:
     
     return filtered_questions
 
-def save_answer(question_id: int, answer: str, difficulty: int):
-    """답변을 데이터베이스에 저장합니다."""
-    if not answer.strip():
-        return False
-    
-    if difficulty < 1 or difficulty > 5:
-        return False
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        INSERT INTO answers (question_id, answer, difficulty) 
-        VALUES (?, ?, ?)
-    ''', (question_id, answer, difficulty))
-    
-    conn.commit()
-    conn.close()
-    return True
-
 def main():
     st.title("❓ 문제 풀기")
     st.markdown("---")
     
     try:
-        all_questions = get_all_questions()
+        all_questions = question_repository.get_all_questions()
         
         if not all_questions:
             st.warning("데이터베이스에 질문이 없습니다. '질문 관리' 페이지에서 질문을 추가하세요.")
@@ -192,11 +152,16 @@ def main():
             
             # 다음 버튼
             col1, col2, col3 = st.columns([1, 1, 1])
-            with col2:
-                if st.button("다음 ▶️", type="primary", use_container_width=True):
+            ai_result = ""
+            with col1:
+                if st.button("오픽 선생님 조언 받기", type="primary", use_container_width=True):
+                    ai_result = ai_service.ask_advise(current_question["question"], answer).content
+
+            with col3:
+                if st.button("저장 후 다음 ▶️", type="primary", use_container_width=True):
                     # 답변 저장
                     if answer.strip():
-                        if save_answer(current_question["id"], answer, difficulty):
+                        if question_repository.save_answer(current_question["id"], answer, difficulty):
                             st.session_state.current_index = current_idx + 1
                             # 다음 질문을 위해 세션 상태 초기화
                             if current_idx + 1 < len(questions):
@@ -207,11 +172,18 @@ def main():
                                     st.session_state[next_answer_key] = ""
                                 if next_difficulty_key not in st.session_state:
                                     st.session_state[next_difficulty_key] = 3
+                            
                             st.rerun()
                         else:
                             st.error("답변 저장 중 오류가 발생했습니다.")
                     else:
                         st.warning("답변을 입력해주세요.")
+
+            if ai_result:
+                st.subheader("💬 오픽 선생님 조언")
+                st.markdown(f"{ai_result}")
+                print(ai_result)
+        
         else:
             st.success("🎉 모든 문제를 완료했습니다!")
             st.balloons()
