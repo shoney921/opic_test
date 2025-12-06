@@ -9,15 +9,18 @@ class OpenAIService:
 
     def generate_text(self, prompt):
         client = ChatOpenAI(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             api_key=os.getenv("OPENAI_API_KEY")
         )
         return client.invoke(prompt)
 
     def ask_advise(self, question, user_content):
         prompt = f"""
-        당신은 오픽 IM 등급반의 영어 선생님 입니다. 
+        당신은 오픽 IM 등급반의 영어 전문가 선생님 입니다. 
         아래 학생이 작성한 영어 내용에 관해서 더 좋은 문구가 있으면 고쳐서 설명해주고, 추가 설명이 필요한 어휘를 설명해주세요.
+        그리고 질문에 대해서 더 쉽고 간편하게 풀어나갈 수 있는 추가 문장이 있으면 사이사이에 추가해주세요.
+        학생의 수준은 대학교 졸업반 수준이기 때문에, 너무 기본적인 어휘는 설명하지 않아도 됩니다.
+        참고로 학생 영어 내용은 스피킹으로 말한것을 받아 쓴 것이고, 구어 표현으로 쓴 것을 감안해주세요.
         
         ## 오픽 질문
         {question}
@@ -31,6 +34,7 @@ class OpenAIService:
            - 수정 전, 후의 문장 다 표현해주세요.
            - 수정한 문장을 따로 아래에 정리해주시고 그 문장아래에 추가 어휘 내용이 필요한 내용이 있으면 작성해주세요.
            - 추가적으로 한국인들이 발음이 자주 틀릴만한 유의해야하는 것이 있으면 한국어로 읽을때는 어떤점을 유의해야하는지도 작성해주세요.
+           - 발음에 과거 시제로 바뀌면서 발음이 달라지는 단어는 발음 주의사항에 추가해주세요.
 
         ## 주의 사항
         - 결과만 출력해 주세요. 가벼운 답변은 포함할 필요 없습니다.
@@ -44,8 +48,8 @@ class OpenAIService:
         ---
 
         ### 2. 수정 문장 및 어휘 설명
-        #### 1. "I remember a trip I took to Jeju Island when I was about 13 years old."
-        - 수정 전: "uhm.. I remember when I went to Jeju Island."
+        #### 1. [수정] "I remember a trip I took to Jeju Island when I was about 13 years old." ('수정 문장'인지 '신규 추가 문장'인지 구분해주세요.)
+        - 수정 전: "uhm.. I remember when I went to Jeju Island." (신규 추가문장이면 수정 전 문장은 생략해주세요.)
 
         **수정 설명:**  (필수 작성)
         - "when I was about 13 years old"에서 about(약간)이 더 자연스러우며, maybe(아마)는 나이 앞에서는 어색할 수 있습니다.
