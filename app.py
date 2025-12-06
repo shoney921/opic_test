@@ -3,7 +3,7 @@ import sqlite3
 import random
 from typing import List, Dict, Optional
 from repository import QuestionRepository
-from ai_service import AzureOpenAIService
+from ai_service import OpenAIService
 
 # 데이터베이스 파일 경로
 DB_PATH = "questions.db"
@@ -12,7 +12,7 @@ DB_PATH = "questions.db"
 question_repository = QuestionRepository(DB_PATH)
 
 # ai
-ai_service = AzureOpenAIService()
+ai_service = OpenAIService()
 
 # 페이지 설정
 st.set_page_config(
@@ -118,7 +118,6 @@ def main():
             
             answer = st.text_area(
                 "답변을 입력하세요:",
-                value=st.session_state[answer_key],
                 height=300,
                 placeholder="여기에 답변을 타이핑하세요...",
                 key=answer_key
@@ -134,7 +133,6 @@ def main():
                 "난이도 (1: 매우 쉬움 ~ 5: 매우 어려움)",
                 min_value=1,
                 max_value=5,
-                value=st.session_state[difficulty_key],
                 key=difficulty_key
             )
             
