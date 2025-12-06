@@ -1,23 +1,16 @@
 import os
 from dotenv import load_dotenv
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 
 # .env 파일 로드
 load_dotenv()
 
-class AzureOpenAIService:
-    def __init__(self):
-        self.api_key = os.getenv("AZURE_OPENAI_API_KEY")
-        self.endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        self.deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
-        self.api_version = os.getenv("AZURE_OPENAI_API_VERSION")
+class OpenAIService:
 
     def generate_text(self, prompt):
-        client = AzureChatOpenAI(
-            azure_endpoint=self.endpoint,
-            azure_deployment=self.deployment_name,
-            api_version=self.api_version,
-            api_key=self.api_key
+        client = ChatOpenAI(
+            model="gpt-4o-mini",
+            api_key=os.getenv("OPENAI_API_KEY")
         )
         return client.invoke(prompt)
 
@@ -53,14 +46,15 @@ class AzureOpenAIService:
         ### 2. 수정 문장 및 어휘 설명
         #### 1. "I remember a trip I took to Jeju Island when I was about 13 years old."
         - 수정 전: "uhm.. I remember when I went to Jeju Island."
-        - 수정 후: "I remember a trip I took to Jeju Island when I was about 13 years old."
 
-        **어휘 설명:**  
+        **수정 설명:**  (필수 작성)
+        - "when I was about 13 years old"에서 about(약간)이 더 자연스러우며, maybe(아마)는 나이 앞에서는 어색할 수 있습니다.
+
+        **어휘 설명:**  (선택 작성)
         - "uhm.."은 되도록 생략하거나, "Well,"로 대체하는 것이 좋습니다.
         - "I remember a trip I took to Jeju Island"는 좀 더 자연스럽고 명확한 표현입니다.
-        - "when I was about 13 years old"에서 about(약)이 더 자연스러우며, maybe(아마)는 나이 앞에서는 어색할 수 있습니다.
 
-        **발음 주의:**  
+        **발음 주의:**  (선택 작성)
         - Jeju Island에서 ‘Island’의 s는 무금입니다. [ˈaɪ.lənd]
         - "trip"은 [trɪp], ‘트립’이 아니라 ‘춉’에 더 가깝게 들립니다.
 
@@ -69,7 +63,7 @@ class AzureOpenAIService:
         return self.generate_text(prompt)
 
 def main():
-    service = AzureOpenAIService()
+    service = OpenAIService()
 
     result = service.ask_advise(question="Tell me about your early memories of shopping. Where did you go? What did you do there?"
     , user_content="""I remember a time when I was young and lived in Daegu.
