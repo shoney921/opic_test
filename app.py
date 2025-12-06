@@ -61,9 +61,9 @@ def main():
         # 답변 개수가 최대값과 같은 질문들을 제외
         filtered_questions = filter_questions_by_max_answer_count(all_questions)
         
+        # 필터링된 질문이 없으면 모든 문제를 다 푼 것으로 판단하고 모든 질문을 다시 표시
         if not filtered_questions:
-            st.warning("모든 질문이 최대 답변 개수를 가지고 있어 표시할 질문이 없습니다.")
-            return
+            filtered_questions = all_questions
         
         # 질문 셔플 여부 선택
         shuffle_questions = st.checkbox(
@@ -148,28 +148,52 @@ def main():
             
             st.markdown("---")
             
+            # 피드백 세션 상태 초기화
+            feedback_key = f"feedback_{current_question['id']}_{current_idx}"
+            if feedback_key not in st.session_state:
+                st.session_state[feedback_key] = ""
+            
             # 다음 버튼
             col1, col2, col3 = st.columns([1, 1, 1])
-            ai_result = ""
             with col1:
                 if st.button("오픽 선생님 조언 받기", type="primary", use_container_width=True):
-                    ai_result = ai_service.ask_advise(current_question["question"], answer).content
+                    if answer.strip():
+                        ai_result = ai_service.ask_advise(current_question["question"], answer).content
+                        st.session_state[feedback_key] = ai_result
+                        st.rerun()
+                    else:
+                        st.warning("먼저 답변을 입력해주세요.")
 
             with col3:
                 if st.button("저장 후 다음 ▶️", type="primary", use_container_width=True):
                     # 답변 저장
                     if answer.strip():
-                        if question_repository.save_answer(current_question["id"], answer, difficulty):
+                        answer_id = question_repository.save_answer(current_question["id"], answer, difficulty)
+                        if answer_id:
+                            # 피드백이 있으면 함께 저장
+                            feedback_content = st.session_state.get(feedback_key, "")
+                            if feedback_content.strip():
+                                if question_repository.save_feedback(answer_id, feedback_content):
+                                    st.success("답변과 피드백이 저장되었습니다.")
+                                else:
+                                    st.warning("답변은 저장되었지만 피드백 저장 중 오류가 발생했습니다.")
+                            else:
+                                st.success("답변이 저장되었습니다.")
+                            
+                            # 다음 질문으로 이동
                             st.session_state.current_index = current_idx + 1
                             # 다음 질문을 위해 세션 상태 초기화
                             if current_idx + 1 < len(questions):
                                 next_question = questions[current_idx + 1]
                                 next_answer_key = f"answer_{next_question['id']}_{current_idx + 1}"
                                 next_difficulty_key = f"difficulty_{next_question['id']}_{current_idx + 1}"
+                                next_feedback_key = f"feedback_{next_question['id']}_{current_idx + 1}"
                                 if next_answer_key not in st.session_state:
                                     st.session_state[next_answer_key] = ""
                                 if next_difficulty_key not in st.session_state:
                                     st.session_state[next_difficulty_key] = 3
+                                if next_feedback_key not in st.session_state:
+                                    st.session_state[next_feedback_key] = ""
                             
                             st.rerun()
                         else:
@@ -177,10 +201,11 @@ def main():
                     else:
                         st.warning("답변을 입력해주세요.")
 
-            if ai_result:
+            # 피드백 표시
+            feedback_content = st.session_state.get(feedback_key, "")
+            if feedback_content:
                 st.subheader("💬 오픽 선생님 조언")
-                st.markdown(f"{ai_result}")
-                print(ai_result)
+                st.markdown(f"{feedback_content}")
         
         else:
             st.success("🎉 모든 문제를 완료했습니다!")

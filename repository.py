@@ -42,7 +42,7 @@ class QuestionRepository:
         
         return row[0] if row else 0
     
-    def save_answer(self, question_id: int, answer: str, difficulty: int) -> bool:
+    def save_answer(self, question_id: int, answer: str, difficulty: int) -> Optional[int]:
         """
         답변을 데이터베이스에 저장합니다.
         
@@ -52,13 +52,13 @@ class QuestionRepository:
             difficulty: 난이도 (1-5)
         
         Returns:
-            저장 성공 여부
+            저장된 답변의 ID (실패 시 None)
         """
         if not answer.strip():
-            return False
+            return None
         
         if difficulty < 1 or difficulty > 5:
-            return False
+            return None
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -68,6 +68,52 @@ class QuestionRepository:
             VALUES (?, ?, ?)
         ''', (question_id, answer, difficulty))
         
+        answer_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        return True
+        return answer_id
+    
+    def save_feedback(self, answer_id: int, feedback_content: str) -> bool:
+        """
+        답변에 대한 피드백을 데이터베이스에 저장합니다.
+        
+        Args:
+            answer_id: 답변 ID
+            feedback_content: 피드백 내용
+        
+        Returns:
+            저장 성공 여부
+        """
+        if not feedback_content.strip():
+            return False
+        
+        if answer_id is None:
+            return False
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                INSERT INTO feedbacks (answer_id, feedback_content) 
+                VALUES (?, ?)
+            ''', (answer_id, feedback_content))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.IntegrityError:
+            # UNIQUE 제약 조건 위반 시 업데이트
+            conn.rollback()
+            cursor.execute('''
+                UPDATE feedbacks 
+                SET feedback_content = ?, created_at = CURRENT_TIMESTAMP
+                WHERE answer_id = ?
+            ''', (feedback_content, answer_id))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            conn.close()
+            return False
