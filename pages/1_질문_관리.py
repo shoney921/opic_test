@@ -25,7 +25,7 @@ def get_all_questions() -> List[Dict]:
     conn.close()
     return questions
 
-def add_question(question: str) -> bool:
+def add_question(question: str, type: str = None) -> bool:
     """새 질문을 데이터베이스에 추가합니다."""
     if not question.strip():
         return False
@@ -33,7 +33,7 @@ def add_question(question: str) -> bool:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    cursor.execute("INSERT INTO questions (question) VALUES (?)", (question,))
+    cursor.execute("INSERT INTO questions (question, type) VALUES (?, ?)", (question, type))
     
     conn.commit()
     conn.close()
@@ -160,11 +160,17 @@ def main():
                 key="new_question_input"
             )
             
+            new_question_type = st.text_input(
+                "질문 유형을 입력하세요:",
+                placeholder="예: ai, travel, shopping 등",
+                key="new_question_type_input"
+            )
+            
             col1, col2 = st.columns([1, 5])
             with col1:
                 if st.button("추가", type="primary"):
                     if new_question.strip():
-                        if add_question(new_question.strip()):
+                        if add_question(new_question.strip(), new_question_type.strip() if new_question_type.strip() else None):
                             st.success("질문이 추가되었습니다!")
                             st.rerun()
                         else:
